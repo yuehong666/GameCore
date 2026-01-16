@@ -3,7 +3,7 @@
 //--------------------------全局变量------------------------------------------------------------------------
 
 HDC g_hdc = NULL,g_mdc=NULL;//全局设备环境句柄
-HBITMAP g_hBitmap=NULL;//定义一个位图句柄
+HBITMAP g_hBackGround=NULL,g_001=NULL,g_002=NULL;//定义位图句柄
 
 //--------------------------声明函数------------------------------------------------------------------------
 
@@ -107,7 +107,9 @@ BOOL Game_Init(HWND hwnd)
 	
 	//----------位图绘制四步曲之一：加载位图-------------
 
-	g_hBitmap = (HBITMAP)LoadImage(NULL,L"lol.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载位图
+	g_hBackGround = (HBITMAP)LoadImage(NULL,L"lol.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载背景位图
+	g_001 = (HBITMAP)LoadImage(NULL,L"001.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载001图片位图
+	g_002 = (HBITMAP)LoadImage(NULL,L"002.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载002图片位图
 
 	//-----------位图绘制四步曲之二：建立兼容DC----------
 
@@ -124,13 +126,14 @@ BOOL Game_Init(HWND hwnd)
 
 VOID Game_Paint(HWND hwnd)
 {
-	//----------位图绘制四步曲之三：选用位图对象--------------
-
-	SelectObject(g_mdc,g_hBitmap);//将位图对象选入到g_mdc内存DC中
-
-	//----------位图绘制四步曲之四：进行贴图-----------------
-
-	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCCOPY);//采用BitBlt函数贴图，参数设置为窗口大小
+	//先贴背景图
+	SelectObject(g_mdc,g_hBackGround);
+	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCCOPY);
+	//透明遮罩法
+	SelectObject(g_mdc,g_002);
+	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCAND);
+	SelectObject(g_mdc,g_001);
+	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCPAINT);
 
 }
 
@@ -139,7 +142,9 @@ VOID Game_Paint(HWND hwnd)
 BOOL Game_Cleanup(HWND hwnd)
 {
 	//释放资源对象
-	DeleteObject(g_hBitmap);
+	DeleteObject(g_hBackGround);
+	DeleteObject(g_001);
+	DeleteObject(g_002);
 	DeleteDC(g_mdc);
 	return TRUE;
 }
