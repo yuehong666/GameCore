@@ -2,11 +2,8 @@
 #include<time.h>
 //--------------------------全局变量------------------------------------------------------------------------
 
-HDC g_hdc = NULL;//全局设备环境句柄
-HPEN g_hPen[7] = {0};//定义画笔句柄的数组
-HBRUSH g_hBrush[7] = {0};//定义画刷句柄的数组
-int g_iPenStyle[7] = {PS_SOLID,PS_DASH,PS_DOT,PS_DASHDOT,PS_DASHDOTDOT,PS_NULL,PS_INSIDEFRAME};//定义画笔样式数组并初始化
-int g_iBrushStyle[6] = {HS_VERTICAL,HS_HORIZONTAL,HS_CROSS,HS_DIAGCROSS,HS_FDIAGONAL,HS_BDIAGONAL};//定义画刷样式数组并初始化
+HDC g_hdc = NULL,g_mdc=NULL;//全局设备环境句柄
+HBITMAP g_hBitmap=NULL;//定义一个位图句柄
 
 //--------------------------声明函数------------------------------------------------------------------------
 
@@ -107,22 +104,19 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT message,WPARAM wParam,LPARAM lParam)
 BOOL Game_Init(HWND hwnd)
 {
 	g_hdc = GetDC(hwnd);//获取设备环境句柄
-	srand((unsigned)time(NULL));//初始化时间种子
+	
+	//----------位图绘制四步曲之一：加载位图-------------
 
-	//随机初始化画笔和画刷的颜色值
-	for(int i=0;i<=6;i++)
-	{
-		g_hPen[i] = CreatePen(g_iPenStyle[i],1,RGB(rand()%256,rand()%256,rand()%256));
-		if(i==6)
-			g_hBrush[i] = CreateSolidBrush(RGB(rand()%256,rand()%256,rand()%256));
-		else
-			g_hBrush[i] = CreateHatchBrush(g_iBrushStyle[i],RGB(rand()%256,rand()%256,rand()%256));
-	}
+	g_hBitmap = (HBITMAP)LoadImage(NULL,L"lol.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载位图
+
+	//-----------位图绘制四步曲之二：建立兼容DC----------
+
+	g_mdc = CreateCompatibleDC(g_hdc);//建立兼容设备环境的内存DC
 
 
 
 	Game_Paint(hwnd);
-	ReleaseDC(hwnd,g_hdc);
+	ReleaseDC(hwnd,g_hdc);//释放设备环境
 	return TRUE;
 }
 
@@ -130,42 +124,22 @@ BOOL Game_Init(HWND hwnd)
 
 VOID Game_Paint(HWND hwnd)
 {
-	//定义一个Y坐标值
-	int y=0;
+	//----------位图绘制四步曲之三：选用位图对象--------------
 
-	//用7种不同的画笔绘制线条
-	for(int i=0;i<=6;i++)
-	{
-		y=(i+1)*70;
+	SelectObject(g_mdc,g_hBitmap);//将位图对象选入到g_mdc内存DC中
 
-		SelectObject(g_hdc,g_hPen[i]);//将对应的画笔选好
-		MoveToEx(g_hdc,30,y,NULL);//从光标移动到（30，y）
-		LineTo(g_hdc,100,y);//从（30，y）向（100，y）绘制线段
-	}
-	//注意上面画完后Y=420，下面画矩形的时候还有用
-	//定义两个X坐标值
-	int x1=120;
-	int x2=190;
+	//----------位图绘制四步曲之四：进行贴图-----------------
 
-	//用7种不同的画刷填充矩形
-	for(int i=0;i<=6;i++)
-	{
-		SelectObject(g_hdc,g_hBrush[i]);//选择画刷
-		Rectangle(g_hdc,x1,70,x2,y);//画一个矩形（x1,50）(x2,y)
-		x1+=90;
-		x2+=90;
-	}
+	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCCOPY);//采用BitBlt函数贴图，参数设置为窗口大小
+
 }
 
 //Game_Cleanup()资源清理函数
 
 BOOL Game_Cleanup(HWND hwnd)
 {
-	//释放所有画笔画刷句柄
-	for(int i=0;i<=6;i++)
-	{
-		DeleteObject(g_hPen[i]);
-		DeleteObject(g_hBrush[i]);
-	}
+	//释放资源对象
+	DeleteObject(g_hBitmap);
+	DeleteDC(g_mdc);
 	return TRUE;
 }
