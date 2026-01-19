@@ -1,9 +1,13 @@
+#include<iostream>
 #include<Windows.h>
 #include<time.h>
+#include<tchar.h>
+#include<wchar.h>
 //--------------------------全局变量------------------------------------------------------------------------
 
 HDC g_hdc = NULL,g_mdc=NULL;//全局设备环境句柄
-HBITMAP g_hBackGround=NULL,g_001=NULL,g_002=NULL;//定义位图句柄
+HBITMAP g_hSprite[12];//声明位图数组来储存各张位图
+int g_iNum=0;//用于记录目前显示的图号
 
 //--------------------------声明函数------------------------------------------------------------------------
 
@@ -63,7 +67,6 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdline,i
 	}
 
 	//第六步窗口类的注销
-	Game_Cleanup(hwnd);
 	UnregisterClass(L"ForTheDreamOfGameDevelop",wndClass.hInstance);
 	
 
@@ -80,18 +83,19 @@ LRESULT CALLBACK WndProc(HWND hwnd,UINT message,WPARAM wParam,LPARAM lParam)
 
 	switch(message)
 	{
-	case WM_PAINT://若是客户区重绘消息
-		g_hdc=BeginPaint(hwnd,&paintStruct);//指定窗口进行绘制，将绘制有关的消息填入PAINTSTRUCT结构体中
-		Game_Paint(hwnd);
-		EndPaint(hwnd,&paintStruct);//绘画结束
-		ValidateRect(hwnd,NULL);//更新客户区的显示
+	case WM_TIMER://定时器消息
+		Game_Paint(hwnd);//绘图函数
 		break;
 	case WM_KEYDOWN://键盘按下消息
 		if(wParam == VK_ESCAPE)//如果是ESC建
 			DestroyWindow(hwnd);//销毁窗口,并发送WM_DESTROY消息
 		break;
 	case WM_DESTROY://窗口销毁消息
+
+		Game_Cleanup(hwnd);//资源清理
+
 		PostQuitMessage(0);//终止线程请求
+
 		break;
 	default:
 		return DefWindowProc(hwnd,message,wParam,lParam);//默认窗口过程
@@ -105,20 +109,21 @@ BOOL Game_Init(HWND hwnd)
 {
 	g_hdc = GetDC(hwnd);//获取设备环境句柄
 	
-	//----------位图绘制四步曲之一：加载位图-------------
-
-	g_hBackGround = (HBITMAP)LoadImage(NULL,L"lol.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载背景位图
-	g_001 = (HBITMAP)LoadImage(NULL,L"001.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载001图片位图
-	g_002 = (HBITMAP)LoadImage(NULL,L"002.bmp",IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载002图片位图
-
+	wchar_t filename[20];
+	//载入各个位图
+	for(int i=0;i<12;i++)
+	{
+		memset(filename,0,sizeof(filename));//filename初始化
+		swprintf_s(filename,L"%d.bmp",i);//组装对应的图片名称
+		g_hSprite[i] = (HBITMAP)LoadImage(NULL,filename,IMAGE_BITMAP,800,600,LR_LOADFROMFILE);//加载位图
+	}
 	//-----------位图绘制四步曲之二：建立兼容DC----------
 
 	g_mdc = CreateCompatibleDC(g_hdc);//建立兼容设备环境的内存DC
 
+	g_iNum = 0;//设置初始的图号
+	SetTimer(hwnd,1,90,NULL);//建立定时器，间隔0.09秒
 
-
-	Game_Paint(hwnd);
-	ReleaseDC(hwnd,g_hdc);//释放设备环境
 	return TRUE;
 }
 
@@ -126,25 +131,25 @@ BOOL Game_Init(HWND hwnd)
 
 VOID Game_Paint(HWND hwnd)
 {
-	//先贴背景图
-	SelectObject(g_mdc,g_hBackGround);
-	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCCOPY);
-	//透明遮罩法
-	SelectObject(g_mdc,g_002);
-	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCAND);
-	SelectObject(g_mdc,g_001);
-	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCPAINT);
+	//处理图号
+	if(g_iNum == 11)
+		g_iNum = 0;
 
+	//依据图号来贴图
+	SelectObject(g_mdc,g_hSprite[g_iNum]);//根据图号选择位图
+	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCCOPY);//进行贴图
+	g_iNum++;
 }
 
 //Game_Cleanup()资源清理函数
 
 BOOL Game_Cleanup(HWND hwnd)
 {
+	KillTimer(hwnd,1);//删除定时器
 	//释放资源对象
-	DeleteObject(g_hBackGround);
-	DeleteObject(g_001);
-	DeleteObject(g_002);
+	for(int i=0;i<12;i++)
+		DeleteObject(g_hSprite[i]);
 	DeleteDC(g_mdc);
+	ReleaseDC(hwnd,g_hdc);
 	return TRUE;
 }
