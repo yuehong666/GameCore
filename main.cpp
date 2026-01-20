@@ -8,6 +8,7 @@
 HDC g_hdc = NULL,g_mdc=NULL;//全局设备环境句柄
 HBITMAP g_hSprite[12];//声明位图数组来储存各张位图
 int g_iNum=0;//用于记录目前显示的图号
+DWORD g_tPre = 0,g_tNow = 0;//记录时间的变量
 
 //--------------------------声明函数------------------------------------------------------------------------
 
@@ -56,7 +57,7 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdline,i
 	}
 	//第五步消息循环
 
-	MSG msg = { 0 };
+	MSG msg = { 0 };//定义并初始化msg
 	while(msg.message != WM_QUIT)
 	{
 		if( PeekMessage(&msg,0,0,0,PM_REMOVE))
@@ -64,6 +65,13 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR lpCmdline,i
 			TranslateMessage(&msg);//将虚拟建消息转换为字符消息
 			DispatchMessage(&msg);//分发一个消息给窗口程序
 		}
+		else
+		{
+			g_tNow = GetTickCount();//获取当前系统时间
+			if(g_tNow - g_tPre >= 100)//相差0.1秒时重绘
+				Game_Paint(hwnd);
+		}
+
 	}
 
 	//第六步窗口类的注销
@@ -109,7 +117,8 @@ BOOL Game_Init(HWND hwnd)
 {
 	g_hdc = GetDC(hwnd);//获取设备环境句柄
 	
-	wchar_t filename[20];
+	wchar_t filename[20];//定义一个字符串数组用于临时储存文件名
+
 	//载入各个位图
 	for(int i=0;i<12;i++)
 	{
@@ -121,8 +130,7 @@ BOOL Game_Init(HWND hwnd)
 
 	g_mdc = CreateCompatibleDC(g_hdc);//建立兼容设备环境的内存DC
 
-	g_iNum = 0;//设置初始的图号
-	SetTimer(hwnd,1,90,NULL);//建立定时器，间隔0.09秒
+
 
 	return TRUE;
 }
@@ -138,6 +146,7 @@ VOID Game_Paint(HWND hwnd)
 	//依据图号来贴图
 	SelectObject(g_mdc,g_hSprite[g_iNum]);//根据图号选择位图
 	BitBlt(g_hdc,0,0,800,600,g_mdc,0,0,SRCCOPY);//进行贴图
+	g_tPre = GetTickCount();//记录此次绘图时间
 	g_iNum++;
 }
 
@@ -145,7 +154,6 @@ VOID Game_Paint(HWND hwnd)
 
 BOOL Game_Cleanup(HWND hwnd)
 {
-	KillTimer(hwnd,1);//删除定时器
 	//释放资源对象
 	for(int i=0;i<12;i++)
 		DeleteObject(g_hSprite[i]);
