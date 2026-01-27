@@ -19,12 +19,23 @@
 #define WINDOW_TITLE L"DX9学习实例"  //窗口标题
 #define SAFE_RELEASE(p) { if(p) { (p)->Release(); (p)=NULL; } }//定义一个安全释放宏，便于后面COM接口指针的释放
 
+//---------------------------------------------------------------------------------------------
+//顶点缓存使用四步曲之一:设计顶点格式
+//---------------------------------------------------------------------------------------------
+struct CUSTOMVERTEX
+{
+	FLOAT x,y,z,rhw;
+	DWORD color;
+};
+#define D3DFVF_CUSTOMVERTEX ( D3DFVF_XYZRHW | D3DFVF_DIFFUSE )//FVF灵活顶点格式
+
 //--------------------------------全局变量声明-------------------------------------------------
 
 LPDIRECT3DDEVICE9 g_pd3dDevice = NULL;//Direct3D设备对象
 ID3DXFont* g_pFont = NULL;//字体COM接口
 float g_FPS = 0.0f;//帧速率
 wchar_t g_strFPS[50];//包含帧速率的字符数组
+LPDIRECT3DVERTEXBUFFER9 g_pVertexBuffer = NULL;//顶点缓冲区对象
 
 //--------------------------------全局函数声明-------------------------------------------------
 
@@ -171,6 +182,30 @@ HRESULT Objects_Init(HWND hwnd)
 		return E_FAIL;
 	srand(timeGetTime());//用系统时间初始化随机种子
 
+	//顶点缓存使用四步曲之二：创建顶点缓存
+	//-------------------------------------------------------------------------------------------------------
+	if( FAILED( g_pd3dDevice->CreateVertexBuffer( 6*sizeof( CUSTOMVERTEX ),0,D3DFVF_CUSTOMVERTEX,D3DPOOL_DEFAULT,&g_pVertexBuffer,NULL ) ) )
+		return E_FAIL;
+	//-------------------------------------------------------------------------------------------------------
+	//顶点缓存使用四步曲之三：访问顶点缓存
+	//-------------------------------------------------------------------------------------------------------
+	CUSTOMVERTEX vertices[] = {
+									{ 300.0f,100.0f,0.0f,1.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256) },
+									{ 500.0f,100.0f,0.0f,1.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256) },
+									{ 300.0f,300.0f,0.0f,1.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256) },
+									{ 300.0f,300.0f,0.0f,1.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256) },
+									{ (float)(800.0*rand()/(RAND_MAX+1.0)),(float)(600.0*rand()/(RAND_MAX+1.0)),0.0f,1.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256) },
+									{ (float)(800.0*rand()/(RAND_MAX+1.0)),(float)(600.0*rand()/(RAND_MAX+1.0)),0.0f,1.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256) }
+	                          };
+
+	//填充顶点缓冲区
+	VOID* pVertices;
+	if( FAILED( g_pVertexBuffer->Lock( 0,sizeof(vertices),(void**)&pVertices,0 ) ) )
+		return E_FAIL;
+	memcpy(pVertices,vertices,sizeof(vertices));
+	g_pVertexBuffer->Unlock();
+	//-------------------------------------------------------------------------------------------------------
+
 
 	return S_OK;
 }
@@ -190,21 +225,18 @@ void Direct3D_Render(HWND hwnd)
 	g_pd3dDevice->BeginScene();
 	//渲染五步曲之三：正式绘制
 	//---------------------------------------------------------------------------------------------------------
+	g_pd3dDevice->SetRenderState( D3DRS_SHADEMODE,D3DSHADE_GOURAUD );//设置渲染状态
+	//---------------------------------------------------------------------------------------------------------
+	//顶点缓存使用四步曲之四：绘制图形
+	g_pd3dDevice->SetStreamSource( 0,g_pVertexBuffer,0,sizeof(CUSTOMVERTEX) );
+	g_pd3dDevice->SetFVF( D3DFVF_CUSTOMVERTEX );
+	g_pd3dDevice->DrawPrimitive( D3DPT_TRIANGLELIST,0,2 );
+	//---------------------------------------------------------------------------------------------------------
 	//在窗口右上角显示帧数
 	int charCount = swprintf_s(g_strFPS,20,_T("FPS:%.0f"),GetFPS());
 	g_pFont->DrawText(NULL,g_strFPS,charCount,&formatRect,DT_TOP | DT_LEFT,D3DCOLOR_XRGB(255,39,136) );
 
-	//在纵坐标100处，写一段文字
-	formatRect.top = 100;//指定文字的纵坐标
-	g_pFont->DrawText(0,_T("我的学习之旅！！"),-1,&formatRect,DT_CENTER,D3DCOLOR_XRGB(68,139,256));
-
-	//在纵坐标250处，写一段文字
-	formatRect.top = 250;
-	g_pFont->DrawText(0,_T("DX9的学习！！"),-1,&formatRect,DT_CENTER,D3DCOLOR_XRGB(255,255,255));
-
-	//在纵坐标400处，写一段文字
-	formatRect.top = 400;
-	g_pFont->DrawText(0,_T("加油！！！"),-1,&formatRect,DT_CENTER,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256));
+	
 
 	//渲染五步曲之四：结束绘制
 	g_pd3dDevice->EndScene();//结束绘制
@@ -241,6 +273,7 @@ float GetFPS()
 void Direct3D_CleanUp()
 {
 	//释放COM接口对象
+	SAFE_RELEASE(g_pVertexBuffer)
 	SAFE_RELEASE(g_pFont)
 	SAFE_RELEASE(g_pd3dDevice)
 }
