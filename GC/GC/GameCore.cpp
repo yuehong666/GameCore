@@ -39,6 +39,11 @@ float g_FPS = 0.0f;//帧速率
 wchar_t g_strFPS[50];//包含帧速率的字符数组
 LPDIRECT3DVERTEXBUFFER9 g_pVertexBuffer = NULL;//顶点缓冲区对象
 LPDIRECT3DINDEXBUFFER9 g_pIndexBuffer = NULL;//索引缓存对象
+LPD3DXMESH g_teapot = NULL;//茶壶对象
+LPD3DXMESH g_cube = NULL;//盒子对象
+LPD3DXMESH g_sphere = NULL;//球面体对象
+LPD3DXMESH g_torus = NULL;//圆环对象
+D3DXMATRIX g_WorldMatrix[4],R;//定义一些全局的世界矩阵
 
 //--------------------------------全局函数声明-------------------------------------------------
 
@@ -184,54 +189,22 @@ HRESULT Objects_Init(HWND hwnd)
 	//创建字体
 	if( FAILED( D3DXCreateFont(g_pd3dDevice,36,0,0,1,false,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,DEFAULT_QUALITY,0,_T("微软雅黑"),&g_pFont) ) )
 		return E_FAIL;
-	srand(timeGetTime());//用系统时间初始化随机种子
 
-	//顶点缓存使用四步曲之二：创建顶点缓存
-	//-------------------------------------------------------------------------------------------------------
-	if( FAILED( g_pd3dDevice->CreateVertexBuffer( 8*sizeof( CUSTOMVERTEX ),0,D3DFVF_CUSTOMVERTEX,D3DPOOL_DEFAULT,&g_pVertexBuffer,NULL ) ) )
-		return E_FAIL;
-	//-------------------------------------------------------------------------------------------------------
-	//索引缓存四步区之二：创建索引缓存
-	//-------------------------------------------------------------------------------------------------------
-	if( FAILED( g_pd3dDevice->CreateIndexBuffer( 36*sizeof(WORD),0,D3DFMT_INDEX16,D3DPOOL_DEFAULT,&g_pIndexBuffer,NULL ) ) )
-		return E_FAIL;
-	//-------------------------------------------------------------------------------------------------------
-	//顶点缓存使用四步曲之三：访问顶点缓存
-	//-------------------------------------------------------------------------------------------------------
-	//顶点数据的设置
-	CUSTOMVERTEX vertices[] = {
-									{-20.0f,20.0f,-20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{-20.0f,20.0f,20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{20.0f,20.0f,20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{20.0f,20.0f,-20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{-20.0f,-20.0f,-20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{-20.0f,-20.0f,20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{20.0f,-20.0f,20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)},
-									{20.0f,-20.0f,-20.0f,D3DCOLOR_XRGB(rand()%256,rand()%256,rand()%256)}
-								};
 
-	//填充顶点缓冲区
-	VOID* pVertices;
-	if( FAILED( g_pVertexBuffer->Lock( 0,sizeof(vertices),(void**)&pVertices,0 ) ) )
-		return E_FAIL;
-	memcpy(pVertices,vertices,sizeof(vertices));
-	g_pVertexBuffer->Unlock();
-	//-------------------------------------------------------------------------------------------------------
-	//索引缓存四步区之三：访问索引缓存
-	//-------------------------------------------------------------------------------------------------------
-	//索引数组的设置
-	WORD Indices[] = { 0,1,2,0,2,3,0,3,7,0,7,4,0,4,5,0,5,1,2,6,7,2,7,3,2,5,6,2,1,5,4,6,5,4,7,6 };
-
-	//填充索引数据
-	WORD *pIndices = NULL;
-	g_pIndexBuffer->Lock(0,0,(void**)&pIndices,0);
-	memcpy(pIndices,Indices,sizeof(Indices));
-	g_pIndexBuffer->Unlock();
-	//-------------------------------------------------------------------------------------------------------
+	//物体的创建
+	if( FAILED( D3DXCreateBox( g_pd3dDevice,2,2,2,&g_cube,NULL ) ) )//立方体的创建
+		return false;
+	if( FAILED( D3DXCreateTeapot( g_pd3dDevice,&g_teapot,NULL ) ) )//茶壶的创建
+		return false;
+	if( FAILED( D3DXCreateSphere( g_pd3dDevice,1.5,25,25,&g_sphere,NULL ) ) )//球面体的创建
+		return false;
+	if( FAILED( D3DXCreateTorus( g_pd3dDevice,0.5f,1.2f,25,25,&g_torus,NULL ) ) )//圆环体的创建
+		return false;
 
 	//设置渲染状态
 	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING,FALSE);//关闭光照
 	g_pd3dDevice->SetRenderState(D3DRS_CULLMODE,D3DCULL_CCW);//开启背面消隐
+	g_pd3dDevice->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);//设置线框填充模式
 
 	return S_OK;
 }
@@ -241,7 +214,7 @@ HRESULT Objects_Init(HWND hwnd)
 void Direct3D_Render(HWND hwnd)
 {
 	//渲染五步曲之一：清屏操作
-	g_pd3dDevice->Clear(0,NULL,D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,D3DCOLOR_XRGB(255,255,255),1.0f,0);
+	g_pd3dDevice->Clear(0,NULL,D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER,D3DCOLOR_XRGB(0,0,0),1.0f,0);
 
 	//定义一个矩形，用于获取主窗口矩形
 	RECT formatRect;
@@ -258,11 +231,29 @@ void Direct3D_Render(HWND hwnd)
 	if(::GetAsyncKeyState(0x32) & 0x8000f)//若数字键2被按下，进行实体填充
 		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE,D3DFILL_SOLID);
 	//---------------------------------------------------------------------------------------------------------
-	//顶点缓存和索引缓存使用四步曲之四：绘制图形
-	g_pd3dDevice->SetStreamSource( 0,g_pVertexBuffer,0,sizeof(CUSTOMVERTEX) );//顶点缓存与渲染流水线相关联
-	g_pd3dDevice->SetFVF( D3DFVF_CUSTOMVERTEX );//灵活顶点格式
-	g_pd3dDevice->SetIndices(g_pIndexBuffer);//设置索引缓存
-	g_pd3dDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST,0,0,8,0,12);//利用索引缓存和顶点缓存绘制图形
+	//绘制图形
+	D3DXMatrixRotationY(&R,::timeGetTime()/1440.0f);//设置公转的矩阵
+
+	//进行立方体的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[0],3.0f,-3.0f,0.0f);
+	g_WorldMatrix[0] = g_WorldMatrix[0] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD,&g_WorldMatrix[0]);
+	g_cube->DrawSubset(0);
+	//进行茶壶的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[1],-3.0f,-3.0f,0.0f);
+	g_WorldMatrix[1] = g_WorldMatrix[1] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD,&g_WorldMatrix[1]);
+	g_teapot->DrawSubset(0);
+	//进行圆环的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[2],3.0f,3.0f,0.0f);
+	g_WorldMatrix[2] = g_WorldMatrix[2] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD,&g_WorldMatrix[2]);
+	g_torus->DrawSubset(0);
+	//进行球面体的绘制
+	D3DXMatrixTranslation(&g_WorldMatrix[3],-3.0f,3.0f,0.0f);
+	g_WorldMatrix[3] = g_WorldMatrix[3] * R;
+	g_pd3dDevice->SetTransform(D3DTS_WORLD,&g_WorldMatrix[3]);
+	g_sphere->DrawSubset(0);
 	//---------------------------------------------------------------------------------------------------------
 	//在窗口右上角显示帧数
 	int charCount = swprintf_s(g_strFPS,20,_T("FPS:%.0f"),GetFPS());
@@ -305,6 +296,10 @@ float GetFPS()
 void Direct3D_CleanUp()
 {
 	//释放COM接口对象
+	SAFE_RELEASE(g_torus)
+	SAFE_RELEASE(g_sphere)
+	SAFE_RELEASE(g_cube)
+	SAFE_RELEASE(g_teapot)
 	SAFE_RELEASE(g_pIndexBuffer)
 	SAFE_RELEASE(g_pVertexBuffer)
 	SAFE_RELEASE(g_pFont)
@@ -326,7 +321,7 @@ VOID Matrix_Set()
 
 	//2.取景变换矩阵的设置
 	D3DXMATRIX matView;//定义一个矩阵
-	D3DXVECTOR3 vEye(0.0f,0.0f,-200.0f);//摄像机的位置
+	D3DXVECTOR3 vEye(0.0f,0.0f,-20.0f);//摄像机的位置
 	D3DXVECTOR3 vAt(0.0f,0.0f,0.0f);//观察点的的位置
 	D3DXVECTOR3 vUp(0.0f,1.0f,0.0f);//向上的向量
 	D3DXMatrixLookAtLH(&matView,&vEye,&vAt,&vUp);//计算出取景变化矩阵
