@@ -318,9 +318,9 @@ VOID Matrix_Set()
 	//1.世界变化矩阵的设置
 	D3DXMATRIX matWorld,Rx,Ry,Rz;
 	D3DXMatrixIdentity(&matWorld);//单位化世界矩阵
-	D3DXMatrixRotationX(&Rx,D3DX_PI/4.0f);//绕X轴旋转
-	D3DXMatrixRotationY(&Ry,D3DX_PI/4.0f);//绕Y轴旋转
-	D3DXMatrixRotationZ(&Rz,D3DX_PI/4.0f);//绕Z轴旋转
+	D3DXMatrixRotationX(&Rx,D3DX_PI*(::timeGetTime()/1000.0f));//绕X轴旋转
+	D3DXMatrixRotationY(&Ry,D3DX_PI*(::timeGetTime()/1000.0f/2));//绕Y轴旋转
+	D3DXMatrixRotationZ(&Rz,D3DX_PI*(::timeGetTime()/1000.0f/3));//绕Z轴旋转
 	matWorld = Rx * Ry * Rz * matWorld;//最终的组合矩阵
 	g_pd3dDevice->SetTransform(D3DTS_WORLD,&matWorld);//设置世界变换矩阵
 
