@@ -54,6 +54,7 @@ VOID Direct3D_Render(HWND hwnd);//这个函数进行Direct3D渲染代码的书写
 VOID Direct3D_CleanUp();//这个函数进行清理COM资源以及其他资源
 float GetFPS();//计算每秒帧速率
 VOID Matrix_Set();//Direct3D四大变换
+VOID Light_Set(LPDIRECT3DDEVICE9 pd3dDevice,UINT nType);//光照类型的函数
 
 //------------------------------WinMain()函数--------------------------------------------------
 
@@ -201,10 +202,23 @@ HRESULT Objects_Init(HWND hwnd)
 	if( FAILED( D3DXCreateTorus( g_pd3dDevice,0.5f,1.2f,25,25,&g_torus,NULL ) ) )//圆环体的创建
 		return false;
 
+	//设置材质
+	D3DMATERIAL9 mtrl;
+	::ZeroMemory(&mtrl,sizeof(mtrl));
+	mtrl.Ambient = D3DXCOLOR(0.5f,0.5f,0.7f,1.0f);
+	mtrl.Diffuse = D3DXCOLOR(0.6f,0.6f,0.6f,1.0f);
+	mtrl.Specular = D3DXCOLOR(0.3f,0.3f,0.3f,0.3f);
+	mtrl.Emissive = D3DXCOLOR(0.3f,0.0f,0.1f,1.0f);
+	g_pd3dDevice->SetMaterial(&mtrl);
+
+	//设置光照
+	Light_Set(g_pd3dDevice,1);
+
 	//设置渲染状态
-	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING,FALSE);//关闭光照
+	g_pd3dDevice->SetRenderState(D3DRS_LIGHTING,true);//开启光照
 	g_pd3dDevice->SetRenderState(D3DRS_CULLMODE,D3DCULL_CCW);//开启背面消隐
-	g_pd3dDevice->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);//设置线框填充模式
+	g_pd3dDevice->SetRenderState(D3DRS_NORMALIZENORMALS,true);
+	g_pd3dDevice->SetRenderState(D3DRS_SPECULARENABLE,true);
 
 	return S_OK;
 }
@@ -230,6 +244,14 @@ void Direct3D_Render(HWND hwnd)
 		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE,D3DFILL_WIREFRAME);
 	if(::GetAsyncKeyState(0x32) & 0x8000f)//若数字键2被按下，进行实体填充
 		g_pd3dDevice->SetRenderState(D3DRS_FILLMODE,D3DFILL_SOLID);
+	//根据键盘按下的情况设置相应的光照类型
+	if( ::GetAsyncKeyState( 0x51 ) & 0x8000f )//若按下Q建，光源类型设为点光源
+		Light_Set(g_pd3dDevice,1);
+	if( ::GetAsyncKeyState( 0x57 ) & 0x8000f )//若按下W建，光源类型设为平行光源
+		Light_Set(g_pd3dDevice,2);
+	if( ::GetAsyncKeyState( 0x45 ) & 0x8000f )//若按下E建，光源类型设为平行光源
+		Light_Set(g_pd3dDevice,3);
+
 	//---------------------------------------------------------------------------------------------------------
 	//绘制图形
 	D3DXMatrixRotationY(&R,::timeGetTime()/1440.0f);//设置公转的矩阵
@@ -341,4 +363,55 @@ VOID Matrix_Set()
 	vp.MinZ = 0.0f;//视口在深度缓存中的最小深度值
 	vp.MaxZ = 1.0f;//视口在深度缓存中的最大深度值
 	g_pd3dDevice->SetViewport(&vp);//视口的设置
+}
+
+//-----------------------------------Light_Set函数-------------------------------------------------------------
+
+VOID Light_Set(LPDIRECT3DDEVICE9 pd3dDevice,UINT nType)
+{
+	//定义一个光照类型并初始化
+	static D3DLIGHT9 light;
+	::ZeroMemory(&light,sizeof(light));
+
+	//一个switch，给3种光源选项
+	switch(nType)
+	{
+	case 1://点光源
+		light.Type = D3DLIGHT_POINT;
+		light.Ambient = D3DXCOLOR(0.6f,0.6f,0.6f,1.0f);
+		light.Diffuse = D3DXCOLOR(1.0f,1.0f,1.0f,1.0f);
+		light.Specular = D3DXCOLOR(0.3f,0.3f,0.3f,1.0f);
+		light.Position = D3DXVECTOR3(0.0f,200.0f,0.0f);
+		light.Attenuation0 = 1.0f;
+		light.Attenuation1 = 0.0f;
+		light.Attenuation2 = 0.0f;
+		light.Range = 300.0f;
+		break;
+	case 2://平行光
+		light.Type = D3DLIGHT_DIRECTIONAL;
+		light.Ambient = D3DXCOLOR(0.5f,0.5f,0.5f,1.0f);
+		light.Diffuse = D3DXCOLOR(1.0f,1.0f,1.0f,1.0f);
+		light.Specular = D3DXCOLOR(0.3f,0.3f,0.3f,1.0f);
+		light.Direction = D3DXVECTOR3(1.0f,0.0f,0.0f);
+		break;
+	case 3://聚光灯
+		light.Type = D3DLIGHT_SPOT;
+		light.Position = D3DXVECTOR3(100.0f,100.0f,100.0f);
+		light.Direction = D3DXVECTOR3(-1.0f,-1.0f,-1.0f);
+		light.Ambient = D3DXCOLOR(0.3f,0.3f,0.3f,1.0f);
+		light.Diffuse = D3DXCOLOR(1.0f,1.0f,1.0f,1.0f);
+		light.Specular = D3DXCOLOR(0.3f,0.3f,0.3f,0.3f);
+		light.Attenuation0 = 1.0f;
+		light.Attenuation1 = 0.0f;
+		light.Attenuation2 = 0.0f;
+		light.Range = 300.0f;
+		light.Falloff = 0.1f;
+		light.Phi = D3DX_PI / 3.0f;
+		light.Theta = D3DX_PI / 6.0f;
+		break;
+	}
+
+	pd3dDevice->SetLight(0,&light);//设置光源
+	pd3dDevice->LightEnable(0,true);//启用光源
+	pd3dDevice->SetRenderState(D3DRS_AMBIENT,D3DCOLOR_XRGB(36,36,36));//设置环境光
 }
